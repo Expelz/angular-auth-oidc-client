@@ -46,7 +46,8 @@
     "schematics-build": "tsc -p projects/schematics/tsconfig.json",
     "copy": "npm run copy-readme-to-lib-folder && npm run copy-licence-to-lib-folder && npm run schematics-copy",
     "postinstall": "node -e \"if(require('fs').existsSync('.git')){process.exit(1)}\" || is-ci || husky install",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "install": "npm run build"
   },
   "private": true,
   "dependencies": {
