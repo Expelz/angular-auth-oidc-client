@@ -101,28 +101,32 @@ export class SilentRenewService {
       return;
     }
 
-    let callback$ = of(null);
+    this.flowsDataService.setSilentRenewRunningOnHandlerWhenIsNotLauched().then((isSuccess) => {
+      if (!isSuccess) return;
 
-    const isCodeFlow = this.flowHelper.isCurrentFlowCodeFlow();
+      let callback$ = of(null);
 
-    if (isCodeFlow) {
-      const urlParts = e.detail.toString().split('?');
-      callback$ = this.codeFlowCallbackSilentRenewIframe(urlParts);
-    } else {
-      callback$ = this.implicitFlowCallbackService.authorizedImplicitFlowCallback(e.detail);
-    }
+      const isCodeFlow = this.flowHelper.isCurrentFlowCodeFlow();
 
-    callback$.subscribe(
-      (callbackContext) => {
-        this.refreshSessionWithIFrameCompletedInternal$.next(callbackContext);
-        this.flowsDataService.resetSilentRenewRunning();
-      },
-      (err: any) => {
-        this.loggerService.logError('Error: ' + err);
-        this.refreshSessionWithIFrameCompletedInternal$.next(null);
-        this.flowsDataService.resetSilentRenewRunning();
+      if (isCodeFlow) {
+        const urlParts = e.detail.toString().split('?');
+        callback$ = this.codeFlowCallbackSilentRenewIframe(urlParts);
+      } else {
+        callback$ = this.implicitFlowCallbackService.authorizedImplicitFlowCallback(e.detail);
       }
-    );
+
+      callback$.subscribe(
+        (callbackContext) => {
+          this.refreshSessionWithIFrameCompletedInternal$.next(callbackContext);
+          this.flowsDataService.resetSilentRenewRunning();
+        },
+        (err: any) => {
+          this.loggerService.logError('Error: ' + err);
+          this.refreshSessionWithIFrameCompletedInternal$.next(null);
+          this.flowsDataService.resetSilentRenewRunning();
+        }
+      );
+    });
   }
 
   private getExistingIframe() {

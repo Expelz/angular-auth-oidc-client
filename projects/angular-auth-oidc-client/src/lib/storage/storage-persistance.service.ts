@@ -13,7 +13,11 @@ export type StorageKeys =
   | 'authStateControl'
   | 'session_state'
   | 'storageSilentRenewRunning'
-  | 'storageCustomRequestParams';
+  | 'storageCustomRequestParams'
+  | 'oidc-process-running-x'
+  | 'oidc-process-running-y'
+  | 'oidc-on-handler-running-x'
+  | 'oidc-on-handler-running-y';
 
 @Injectable()
 export class StoragePersistanceService {

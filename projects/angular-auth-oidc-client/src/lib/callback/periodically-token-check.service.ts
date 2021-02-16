@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { from, of, throwError } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
 import { AuthStateService } from '../authState/auth-state.service';
 import { ConfigurationProvider } from '../config/config.provider';
@@ -66,19 +66,25 @@ export class PeriodicallyTokenCheckService {
 
         this.loggerService.logDebug('starting silent renew...');
 
-        this.flowsDataService.setSilentRenewRunning();
+        return from(this.flowsDataService.setSilentRenewRunningWhenIsNotLauched()).pipe(
+          switchMap((isSuccessSet) => {
+            if (isSuccessSet) {
+              // Retrieve Dynamically Set Custom Params
+              const customParams: { [key: string]: string | number | boolean } = this.storagePersistanceService.read(
+                'storageCustomRequestParams'
+              );
 
-        // Retrieve Dynamically Set Custom Params
-        const customParams: { [key: string]: string | number | boolean } = this.storagePersistanceService.read(
-          'storageCustomRequestParams'
+              if (this.flowHelper.isCurrentFlowCodeFlowWithRefreshTokens()) {
+                // Refresh Session using Refresh tokens
+                return this.refreshSessionRefreshTokenService.refreshSessionWithRefreshTokens(customParams);
+              }
+
+              return this.refreshSessionIframeService.refreshSessionWithIframe(customParams);
+            }
+
+            return of(null);
+          })
         );
-
-        if (this.flowHelper.isCurrentFlowCodeFlowWithRefreshTokens()) {
-          // Refresh Session using Refresh tokens
-          return this.refreshSessionRefreshTokenService.refreshSessionWithRefreshTokens(customParams);
-        }
-
-        return this.refreshSessionIframeService.refreshSessionWithIframe(customParams);
       })
     );
 
