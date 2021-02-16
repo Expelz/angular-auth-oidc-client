@@ -114,13 +114,13 @@ export class FlowsDataService {
         return false;
       }
 
-      this.loggerService.logDebug(`isSilentRenewRunning > state: ${state} currentTime: ${new Date().toTimeString}`);
+      this.loggerService.logDebug(`isSilentRenewRunning > state: ${state} currentTime: ${new Date().toTimeString()}`);
       if (!!state){
-        this.loggerService.logDebug(`isSilentRenewRunning > state: ${state} > inside !!state > currentTime: ${new Date().toTimeString}`);
+        this.loggerService.logDebug(`isSilentRenewRunning > state: ${state} > inside !!state > currentTime: ${new Date().toTimeString()}`);
         return storageObject.state === state;
       }
 
-      this.loggerService.logDebug(`isSilentRenewRunning > state: ${state} > after !!state > currentTime: ${new Date().toTimeString}`);
+      this.loggerService.logDebug(`isSilentRenewRunning > state: ${state} > after !!state > currentTime: ${new Date().toTimeString()}`);
 
       return storageObject.state === 'running' || storageObject.state === 'onHandler';
     }
@@ -129,9 +129,9 @@ export class FlowsDataService {
   }
 
   setSilentRenewRunningOnHandlerWhenIsNotLauched(): Promise<boolean> {
-    this.loggerService.logDebug(`setSilentRenewRunningOnHandlerWhenIsNotLauched currentTime: ${new Date().toTimeString}`);
+    this.loggerService.logDebug(`setSilentRenewRunningOnHandlerWhenIsNotLauched currentTime: ${new Date().toTimeString()}`);
     const lockingModel: MutualExclusionLockingModel  = {
-      state: 'running',
+      state: 'onHandler',
       xKey: 'oidc-on-handler-running-x',
       yKey: 'oidc-on-handler-running-y'
     }
@@ -140,7 +140,7 @@ export class FlowsDataService {
   }
 
   setSilentRenewRunningWhenIsNotLauched(): Promise<boolean> {
-    this.loggerService.logDebug(`setSilentRenewRunningWhenIsNotLauched currentTime: ${new Date().toTimeString}`);
+    this.loggerService.logDebug(`setSilentRenewRunningWhenIsNotLauched currentTime: ${new Date().toTimeString()}`);
 
     const lockingModel: MutualExclusionLockingModel  = {
       state: 'running',
@@ -178,7 +178,7 @@ export class FlowsDataService {
       this.storagePersistanceService.write(lockingModel.xKey, currentRandomId);
       const readedValueY = this.storagePersistanceService.read(lockingModel.yKey)
 
-      if (readedValueY !== '') {
+      if (!!readedValueY) {
         this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > readedValueY !== '' > currentRandomId: ${currentRandomId}`);
         const storageObject = JSON.parse(readedValueY);
         const dateOfLaunchedProcessUtc = Date.parse(storageObject.dateOfLaunchedProcessUtc);
