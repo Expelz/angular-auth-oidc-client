@@ -5,9 +5,9 @@ import { StorageKeys, StoragePersistanceService } from '../storage/storage-persi
 import { RandomService } from './random/random.service';
 
 export interface MutualExclusionLockingModel {
-  xKey: StorageKeys,
-  yKey: StorageKeys,
-  state: string
+  xKey: StorageKeys;
+  yKey: StorageKeys;
+  state: string;
 }
 
 @Injectable()
@@ -30,7 +30,33 @@ export class FlowsDataService {
   }
 
   getAuthStateControl(): any {
-    return this.storagePersistanceService.read('authStateControl');
+    const json = this.storagePersistanceService.read('authStateControl');
+    const storageObject = !!json ? JSON.parse(json) : null;
+
+    this.loggerService.logDebug(`getAuthStateControl > currentTime: ${new Date().toTimeString()}`);
+
+    if (storageObject) {
+      const dateOfLaunchedProcessUtc = Date.parse(storageObject.dateOfLaunchedProcessUtc);
+      const currentDateUtc = Date.parse(new Date().toISOString());
+      const elapsedTimeInMilliseconds = Math.abs(currentDateUtc - dateOfLaunchedProcessUtc);
+      const isProbablyStuck = elapsedTimeInMilliseconds > this.configurationProvider.openIDConfiguration.silentRenewTimeoutInSeconds * 1000;
+
+      if (isProbablyStuck) {
+        this.loggerService.logWarning('getAuthStateControl -> silent renew process is probably stuck, AuthState will be reset.');
+        this.storagePersistanceService.write('authStateControl', '');
+        return false;
+      }
+
+      this.loggerService.logDebug(
+        `getAuthStateControl > STATE SUCCESSFULLY RETURNED ${storageObject.state} > currentTime: ${new Date().toTimeString()}`
+      );
+
+      return storageObject.state;
+    }
+
+    this.loggerService.logWarning(`getAuthStateControl > storageObject IS NULL RETURN FALSE > currentTime: ${new Date().toTimeString()}`);
+
+    return false;
   }
 
   setAuthStateControl(authStateControl: string) {
@@ -38,11 +64,20 @@ export class FlowsDataService {
   }
 
   getExistingOrCreateAuthStateControl(): any {
-    let state = this.storagePersistanceService.read('authStateControl');
+    let state = this.getAuthStateControl();
     if (!state) {
-      state = this.randomService.createRandom(40);
-      this.storagePersistanceService.write('authStateControl', state);
+      state = this.createAuthStateControl();
     }
+    return state;
+  }
+
+  createAuthStateControl(): any {
+    const state = this.randomService.createRandom(40);
+    const storageObject = {
+      state: state,
+      dateOfLaunchedProcessUtc: new Date().toISOString(),
+    };
+    this.storagePersistanceService.write('authStateControl', storageObject);
     return state;
   }
 
@@ -98,7 +133,31 @@ export class FlowsDataService {
     this.storagePersistanceService.write('storageSilentRenewRunning', '');
   }
 
-  isSilentRenewRunning(state: string = null) {
+  // isSilentRenewRunning() {
+  //   const json = this.storagePersistanceService.read('storageSilentRenewRunning');
+  //   const storageObject = !!json ? JSON.parse(json) : null;
+
+  //   if (storageObject) {
+  //     const dateOfLaunchedProcessUtc = Date.parse(storageObject.dateOfLaunchedProcessUtc);
+  //     const currentDateUtc = Date.parse(new Date().toISOString());
+  //     const elapsedTimeInMilliseconds = Math.abs(currentDateUtc - dateOfLaunchedProcessUtc);
+  //     const isProbablyStuck = elapsedTimeInMilliseconds > this.configurationProvider.openIDConfiguration.silentRenewTimeoutInSeconds * 1000;
+
+  //     if (isProbablyStuck) {
+  //       this.loggerService.logDebug('silent renew process is probably stuck, state will be reset.');
+  //       this.resetSilentRenewRunning();
+  //       return false;
+  //     }
+
+  //     this.loggerService.logDebug(`isSilentRenewRunning > currentTime: ${new Date().toTimeString()}`);
+
+  //     return storageObject.state === 'running';
+  //   }
+
+  //   return false;
+  // }
+
+  isSilentRenewRunning() {
     const json = this.storagePersistanceService.read('storageSilentRenewRunning');
     const storageObject = !!json ? JSON.parse(json) : null;
 
@@ -114,108 +173,102 @@ export class FlowsDataService {
         return false;
       }
 
-      this.loggerService.logDebug(`isSilentRenewRunning > state: ${state} currentTime: ${new Date().toTimeString()}`);
-      if (!!state){
-        this.loggerService.logDebug(`isSilentRenewRunning > state: ${state} > inside !!state > currentTime: ${new Date().toTimeString()}`);
-        return storageObject.state === state;
-      }
+      this.loggerService.logDebug(`isSilentRenewRunning > currentTime: ${new Date().toTimeString()}`);
 
-      this.loggerService.logDebug(`isSilentRenewRunning > state: ${state} > after !!state > currentTime: ${new Date().toTimeString()}`);
-
-      return storageObject.state === 'running' || storageObject.state === 'onHandler';
+      return storageObject.state === 'running';
     }
 
     return false;
   }
 
-  setSilentRenewRunningOnHandlerWhenIsNotLauched(): Promise<boolean> {
-    this.loggerService.logDebug(`setSilentRenewRunningOnHandlerWhenIsNotLauched currentTime: ${new Date().toTimeString()}`);
-    const lockingModel: MutualExclusionLockingModel  = {
-      state: 'onHandler',
-      xKey: 'oidc-on-handler-running-x',
-      yKey: 'oidc-on-handler-running-y'
-    }
+  // setSilentRenewRunningOnHandlerWhenIsNotLauched(): Promise<boolean> {
+  //   this.loggerService.logDebug(`setSilentRenewRunningOnHandlerWhenIsNotLauched currentTime: ${new Date().toTimeString()}`);
+  //   const lockingModel: MutualExclusionLockingModel  = {
+  //     state: 'onHandler',
+  //     xKey: 'oidc-on-handler-running-x',
+  //     yKey: 'oidc-on-handler-running-y'
+  //   }
 
-    return this.runMutualExclusionLockingAlgorithm(lockingModel, 'storageSilentRenewRunning');
-  }
+  //   return this.runMutualExclusionLockingAlgorithm(lockingModel, 'storageSilentRenewRunning');
+  // }
 
-  setSilentRenewRunningWhenIsNotLauched(): Promise<boolean> {
-    this.loggerService.logDebug(`setSilentRenewRunningWhenIsNotLauched currentTime: ${new Date().toTimeString()}`);
+  // setSilentRenewRunningWhenIsNotLauched(): Promise<boolean> {
+  //   this.loggerService.logDebug(`setSilentRenewRunningWhenIsNotLauched currentTime: ${new Date().toTimeString()}`);
 
-    const lockingModel: MutualExclusionLockingModel  = {
-      state: 'running',
-      xKey: 'oidc-process-running-x',
-      yKey: 'oidc-process-running-y'
-    }
+  //   const lockingModel: MutualExclusionLockingModel  = {
+  //     state: 'running',
+  //     xKey: 'oidc-process-running-x',
+  //     yKey: 'oidc-process-running-y'
+  //   }
 
-    return this.runMutualExclusionLockingAlgorithm(lockingModel, 'storageSilentRenewRunning');
-  }
+  //   return this.runMutualExclusionLockingAlgorithm(lockingModel, 'storageSilentRenewRunning');
+  // }
 
-  private runMutualExclusionLockingAlgorithm(lockingModel: MutualExclusionLockingModel, key: StorageKeys): Promise<boolean> {
-    return new Promise((resolve) => {
-      const currentRandomId = `${Math.random().toString(36).substr(2, 9)}_${new Date().getUTCMilliseconds()}`;
+  // private runMutualExclusionLockingAlgorithm(lockingModel: MutualExclusionLockingModel, key: StorageKeys): Promise<boolean> {
+  //   return new Promise((resolve) => {
+  //     const currentRandomId = `${Math.random().toString(36).substr(2, 9)}_${new Date().getUTCMilliseconds()}`;
 
-      this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > currentRandomId: ${currentRandomId}`);
+  //     this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > currentRandomId: ${currentRandomId}`);
 
-      const onSuccessLocking = () => {
-        this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > INSIDE onSuccessLocking > currentRandomId: ${currentRandomId}`);
-        if (this.isSilentRenewRunning(lockingModel.state)) {
-          this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > INSIDE onSuccessLocking > this.isSilentRenewRunning return true we go back > currentRandomId: ${currentRandomId}`);
-          resolve(false);
-        } else {
-          this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > INSIDE onSuccessLocking > VICTORY !!!! WE WIN AND SET VALUE> currentRandomId: ${currentRandomId}`);
-          const storageObject = {
-            state: lockingModel.state,
-            dateOfLaunchedProcessUtc: new Date().toISOString(),
-          }; 
-          this.storagePersistanceService.write(key, JSON.stringify(storageObject));
-          // Release lock
-          this.storagePersistanceService.write(lockingModel.yKey, '');
-          resolve(true);
-        }
-      };
-      
-      this.storagePersistanceService.write(lockingModel.xKey, currentRandomId);
-      const readedValueY = this.storagePersistanceService.read(lockingModel.yKey)
+  //     const onSuccessLocking = () => {
+  //       this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > INSIDE onSuccessLocking > currentRandomId: ${currentRandomId}`);
+  //       if (this.isSilentRenewRunning(lockingModel.state)) {
+  //         this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > INSIDE onSuccessLocking > this.isSilentRenewRunning return true we go back > currentRandomId: ${currentRandomId}`);
+  //         resolve(false);
+  //       } else {
+  //         this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > INSIDE onSuccessLocking > VICTORY !!!! WE WIN AND SET VALUE> currentRandomId: ${currentRandomId}`);
+  //         const storageObject = {
+  //           state: lockingModel.state,
+  //           dateOfLaunchedProcessUtc: new Date().toISOString(),
+  //         };
+  //         this.storagePersistanceService.write(key, JSON.stringify(storageObject));
+  //         // Release lock
+  //         this.storagePersistanceService.write(lockingModel.yKey, '');
+  //         resolve(true);
+  //       }
+  //     };
 
-      if (!!readedValueY) {
-        this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > readedValueY !== '' > currentRandomId: ${currentRandomId}`);
-        const storageObject = JSON.parse(readedValueY);
-        const dateOfLaunchedProcessUtc = Date.parse(storageObject.dateOfLaunchedProcessUtc);
-        const currentDateUtc = Date.parse(new Date().toISOString());
-        const elapsedTimeInMilliseconds = Math.abs(currentDateUtc - dateOfLaunchedProcessUtc);
-        const isProbablyStuck = elapsedTimeInMilliseconds > this.configurationProvider.openIDConfiguration.silentRenewTimeoutInSeconds * 1000;
+  //     this.storagePersistanceService.write(lockingModel.xKey, currentRandomId);
+  //     const readedValueY = this.storagePersistanceService.read(lockingModel.yKey)
 
-        if (isProbablyStuck){
-           // Release lock
-        this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > isProbablyStuck - clear Y key> currentRandomId: ${currentRandomId}`);
-        this.storagePersistanceService.write(lockingModel.yKey, '');
-        }
+  //     if (!!readedValueY) {
+  //       this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > readedValueY !== '' > currentRandomId: ${currentRandomId}`);
+  //       const storageObject = JSON.parse(readedValueY);
+  //       const dateOfLaunchedProcessUtc = Date.parse(storageObject.dateOfLaunchedProcessUtc);
+  //       const currentDateUtc = Date.parse(new Date().toISOString());
+  //       const elapsedTimeInMilliseconds = Math.abs(currentDateUtc - dateOfLaunchedProcessUtc);
+  //       const isProbablyStuck = elapsedTimeInMilliseconds > this.configurationProvider.openIDConfiguration.silentRenewTimeoutInSeconds * 1000;
 
-        resolve(false);
-        return;
-      }
+  //       if (isProbablyStuck){
+  //          // Release lock
+  //       this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > isProbablyStuck - clear Y key> currentRandomId: ${currentRandomId}`);
+  //       this.storagePersistanceService.write(lockingModel.yKey, '');
+  //       }
 
-      this.storagePersistanceService.write(lockingModel.yKey, JSON.stringify({
-        id: currentRandomId,
-        dateOfLaunchedProcessUtc: new Date().toISOString()
-      }));
+  //       resolve(false);
+  //       return;
+  //     }
 
-      if (this.storagePersistanceService.read(lockingModel.xKey) !== currentRandomId) {
-        this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > before setTimeout > currentRandomId: ${currentRandomId}`);
-        setTimeout(() => {
-          if (this.storagePersistanceService.read(lockingModel.yKey) !== currentRandomId) {
-            this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > inside setTimeout > we LOSE > currentRandomId: ${currentRandomId}`);
-            resolve(false);
-            return;
-          }
-          this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > inside setTimeout > we WIN > currentRandomId: ${currentRandomId}`);
-          onSuccessLocking();
-        }, Math.round(Math.random() * 100));
-      } else {
-        this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > WE WIN ALL CONDITIONS > currentRandomId: ${currentRandomId}`);
-        onSuccessLocking();
-      }
-    });
-  }
+  //     this.storagePersistanceService.write(lockingModel.yKey, JSON.stringify({
+  //       id: currentRandomId,
+  //       dateOfLaunchedProcessUtc: new Date().toISOString()
+  //     }));
+
+  //     if (this.storagePersistanceService.read(lockingModel.xKey) !== currentRandomId) {
+  //       this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > before setTimeout > currentRandomId: ${currentRandomId}`);
+  //       setTimeout(() => {
+  //         if (this.storagePersistanceService.read(lockingModel.yKey) !== currentRandomId) {
+  //           this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > inside setTimeout > we LOSE > currentRandomId: ${currentRandomId}`);
+  //           resolve(false);
+  //           return;
+  //         }
+  //         this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > inside setTimeout > we WIN > currentRandomId: ${currentRandomId}`);
+  //         onSuccessLocking();
+  //       }, Math.round(Math.random() * 100));
+  //     } else {
+  //       this.loggerService.logDebug(`runMutualExclusionLockingAlgorithm - state "${lockingModel.state}" > WE WIN ALL CONDITIONS > currentRandomId: ${currentRandomId}`);
+  //       onSuccessLocking();
+  //     }
+  //   });
+  // }
 }

@@ -17,6 +17,7 @@ import { SigninKeyDataService } from './flows/signin-key-data.service';
 import { CheckSessionService } from './iframe/check-session.service';
 import { IFrameService } from './iframe/existing-iframe.service';
 import { SilentRenewService } from './iframe/silent-renew.service';
+import { TabsSynchronizationService } from './iframe/tabs-synchronization.service';
 import { LoggerService } from './logging/logger.service';
 import { LoginService } from './login/login.service';
 import { LogoffRevocationService } from './logoffRevoke/logoff-revocation.service';
@@ -78,6 +79,7 @@ export class AuthModule {
           provide: AbstractSecurityStorage,
           useClass: token.storage || BrowserStorageService,
         },
+        TabsSynchronizationService,
       ],
     };
   }

@@ -14,6 +14,7 @@ import { LoggerService } from '../logging/logger.service';
 import { FlowHelper } from '../utils/flowHelper/flow-helper.service';
 import { ValidationResult } from '../validation/validation-result';
 import { IFrameService } from './existing-iframe.service';
+import { TabsSynchronizationService } from './tabs-synchronization.service';
 
 const IFRAME_FOR_SILENT_RENEW_IDENTIFIER = 'myiFrameForSilentRenew';
 
@@ -34,7 +35,8 @@ export class SilentRenewService {
     private loggerService: LoggerService,
     private flowHelper: FlowHelper,
     private implicitFlowCallbackService: ImplicitFlowCallbackService,
-    private intervallService: IntervallService
+    private intervallService: IntervallService,
+    private tabsSynchronizationService: TabsSynchronizationService
   ) {}
 
   getOrCreateIframe(): HTMLIFrameElement {
@@ -101,15 +103,28 @@ export class SilentRenewService {
       return;
     }
 
-    this.flowsDataService.setSilentRenewRunningOnHandlerWhenIsNotLauched().then((isSuccess) => {
-      if (!isSuccess) return;
+    const urlParts = e.detail.toString().split('?');
+    const params = new HttpParams({
+      fromString: urlParts[1],
+    });
+
+    const stateFromUrl = params.get('state');
+    const currentState = this.flowsDataService.getAuthStateControl();
+
+    if (stateFromUrl !== currentState) {
+      this.loggerService.logError(
+        `silentRenewEventHandler > states don't match stateFromUrl: ${stateFromUrl} currentState: ${currentState}`
+      );
+    }
+
+    this.tabsSynchronizationService.isLeaderCheck().then((isLeader) => {
+      if (!isLeader) return;
 
       let callback$ = of(null);
 
       const isCodeFlow = this.flowHelper.isCurrentFlowCodeFlow();
 
       if (isCodeFlow) {
-        const urlParts = e.detail.toString().split('?');
         callback$ = this.codeFlowCallbackSilentRenewIframe(urlParts);
       } else {
         callback$ = this.implicitFlowCallbackService.authorizedImplicitFlowCallback(e.detail);
@@ -119,6 +134,7 @@ export class SilentRenewService {
         (callbackContext) => {
           this.refreshSessionWithIFrameCompletedInternal$.next(callbackContext);
           this.flowsDataService.resetSilentRenewRunning();
+          this.tabsSynchronizationService.sendSilentRenewFinishedNotification();
         },
         (err: any) => {
           this.loggerService.logError('Error: ' + err);

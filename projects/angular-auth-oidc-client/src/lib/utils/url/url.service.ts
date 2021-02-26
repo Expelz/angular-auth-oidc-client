@@ -267,7 +267,7 @@ export class UrlService {
   }
 
   private createUrlCodeFlowWithSilentRenew(customParams?: { [key: string]: string | number | boolean }): string {
-    const state = this.flowsDataService.getExistingOrCreateAuthStateControl();
+    const state = this.flowsDataService.createAuthStateControl();
     const nonce = this.flowsDataService.createNonce();
 
     this.loggerService.logDebug('RefreshSession created. adding myautostate: ' + state);
@@ -312,7 +312,7 @@ export class UrlService {
   }
 
   private createUrlCodeFlowAuthorize(customParams?: { [key: string]: string | number | boolean }): string {
-    const state = this.flowsDataService.getExistingOrCreateAuthStateControl();
+    const state = this.flowsDataService.createAuthStateControl();
     const nonce = this.flowsDataService.createNonce();
     this.loggerService.logDebug('Authorize created. adding myautostate: ' + state);
 

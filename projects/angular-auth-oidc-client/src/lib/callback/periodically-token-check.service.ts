@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { from, of, throwError } from 'rxjs';
-import { catchError, switchMap } from 'rxjs/operators';
+import { catchError, switchMap, take } from 'rxjs/operators';
 import { AuthStateService } from '../authState/auth-state.service';
 import { ConfigurationProvider } from '../config/config.provider';
 import { FlowsDataService } from '../flows/flows-data.service';
@@ -10,6 +10,7 @@ import { LoggerService } from '../logging/logger.service';
 import { StoragePersistanceService } from '../storage/storage-persistance.service';
 import { UserService } from '../userData/user-service';
 import { FlowHelper } from '../utils/flowHelper/flow-helper.service';
+import { TabsSynchronizationService } from './../iframe/tabs-synchronization.service';
 import { IntervallService } from './intervall.service';
 import { RefreshSessionRefreshTokenService } from './refresh-session-refresh-token.service';
 
@@ -26,7 +27,8 @@ export class PeriodicallyTokenCheckService {
     private refreshSessionIframeService: RefreshSessionIframeService,
     private refreshSessionRefreshTokenService: RefreshSessionRefreshTokenService,
     private intervalService: IntervallService,
-    private storagePersistanceService: StoragePersistanceService
+    private storagePersistanceService: StoragePersistanceService,
+    private tabsSynchronizationService: TabsSynchronizationService
   ) {}
 
   startTokenValidationPeriodically(repeatAfterSeconds: number) {
@@ -66,9 +68,11 @@ export class PeriodicallyTokenCheckService {
 
         this.loggerService.logDebug('starting silent renew...');
 
-        return from(this.flowsDataService.setSilentRenewRunningWhenIsNotLauched()).pipe(
-          switchMap((isSuccessSet) => {
-            if (isSuccessSet) {
+        return from(this.tabsSynchronizationService.isLeaderCheck()).pipe(
+          take(1),
+          switchMap((isLeader) => {
+            if (isLeader && !this.flowsDataService.isSilentRenewRunning()) {
+              this.flowsDataService.setSilentRenewRunning();
               // Retrieve Dynamically Set Custom Params
               const customParams: { [key: string]: string | number | boolean } = this.storagePersistanceService.read(
                 'storageCustomRequestParams'
