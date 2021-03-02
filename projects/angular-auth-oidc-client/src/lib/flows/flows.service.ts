@@ -143,7 +143,7 @@ export class FlowsService {
 
   // STEP 1 Refresh session
   private refreshSessionWithRefreshTokens(): Observable<CallbackContext> {
-    const stateData = this.flowsDataService.getExistingOrCreateAuthStateControl();
+    const stateData = this.flowsDataService.getExistingOrCreateAuthStateControl('refresh-token');
     this.loggerService.logDebug('RefreshSession created. adding myautostate: ' + stateData);
     const refreshToken = this.authStateService.getRefreshToken();
     const idToken = this.authStateService.getIdToken();

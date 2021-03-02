@@ -10,8 +10,10 @@ import { LoggerService } from './../logging/logger.service';
 @Injectable()
 export class TabsSynchronizationService {
   private _isLeaderSubjectInitialized = false;
+  private _isClosed = false;
   private _elector: LeaderElector;
   private _silentRenewFinishedChannel: BroadcastChannel;
+  private _leaderChannel: BroadcastChannel;
   private _silentRenewFinished$ = new ReplaySubject<boolean>(1);
   private _leaderSubjectInitialized$ = new ReplaySubject<boolean>(1);
 
@@ -24,6 +26,10 @@ export class TabsSynchronizationService {
     private readonly loggerService: LoggerService
   ) {
     this.Initialization();
+  }
+
+  public get isClosed(): boolean {
+    return this._isClosed;
   }
 
   public isLeaderCheck(): Promise<boolean> {
@@ -45,17 +51,15 @@ export class TabsSynchronizationService {
     }
 
     this.loggerService.logDebug(
-      `isLeaderCheck > IS LEADER IS ALREADY INITIALIZED SUCCESSFULLY> prefix: ${this._prefix} > currentRandomId: ${this._currentRandomId}`
+      `isLeaderCheck > IS LEADER IS ALREADY INITIALIZED > prefix: ${this._prefix} > currentRandomId: ${this._currentRandomId}`
     );
 
     return new Promise((resolve) => {
-      setTimeout(() => {
-        const isLeader = this._elector.isLeader;
-        this.loggerService.logWarning(
-          `isLeaderCheck > prefix: ${this._prefix} > currentRandomId: ${this._currentRandomId} > inside setTimeout isLeader = ${isLeader}`
-        );
-        resolve(isLeader);
-      }, 1000);
+      const isLeaderResult = this._elector.isLeader;
+      this.loggerService.logDebug(
+        `isLeaderCheck > isLeader result = ${isLeaderResult} > prefix: ${this._prefix} > currentRandomId: ${this._currentRandomId}`
+      );
+      resolve(isLeaderResult);
     });
   }
 
@@ -71,23 +75,59 @@ export class TabsSynchronizationService {
     this._silentRenewFinishedChannel.postMessage(`Silent renew finished by _currentRandomId ${this._currentRandomId}`);
   }
 
+  public closeTabSynchronization(): void {
+    this.loggerService.logWarning(
+      `Tab synchronization has been closed > prefix: ${this._prefix} > currentRandomId: ${this._currentRandomId}`
+    );
+    this._elector.die();
+    this._silentRenewFinishedChannel.close();
+    this._leaderChannel.close();
+    this._isLeaderSubjectInitialized = false;
+
+    this._isClosed = true;
+  }
+
+  public reInitialize(): void {
+    this.loggerService.logDebug('TabsSynchronizationService re-initialization process started...');
+
+    if (!this._isClosed) {
+      throw Error('TabsSynchronizationService cannot be re-initialized when it is not closed.');
+    }
+
+    this._silentRenewFinished$ = new ReplaySubject<boolean>(1);
+    this._leaderSubjectInitialized$ = new ReplaySubject<boolean>(1);
+
+    this.Initialization();
+
+    this._isClosed = false;
+  }
+
   private Initialization(): void {
     this.loggerService.logDebug('TabsSynchronizationService > Initialization started');
     this._prefix = this.configurationProvider.openIDConfiguration?.clientId || '';
-    const channel = new BroadcastChannel(`${this._prefix}_leader`);
+    this._leaderChannel = new BroadcastChannel(`${this._prefix}_leader`);
 
-    this._elector = createLeaderElection(channel, {
+    this._elector = createLeaderElection(this._leaderChannel, {
       fallbackInterval: 2000, // optional configuration for how often will renegotiation for leader occur
       responseTime: 1000, // optional configuration for how long will instances have to respond
     });
 
-    this._elector.awaitLeadership().then(() => {
-      if (!this._isLeaderSubjectInitialized) {
-        this._isLeaderSubjectInitialized = true;
-        this._leaderSubjectInitialized$.next(true);
-      }
+    this._elector.applyOnce().then((isLeader) => {
+      this.loggerService.logDebug('FIRST applyOnce finished...');
+      this._isLeaderSubjectInitialized = true;
+      this._leaderSubjectInitialized$.next(true);
 
-      this.loggerService.logDebug(`this tab is now leader > prefix: ${this._prefix} > currentRandomId: ${this._currentRandomId}`);
+      if (!isLeader) {
+        this._elector.awaitLeadership().then(() => {
+          this.loggerService.logDebug(
+            `FROM awaitLeadership > this tab is now leader > prefix: ${this._prefix} > currentRandomId: ${this._currentRandomId}`
+          );
+        });
+      } else {
+        this.loggerService.logDebug(
+          `FROM INITIALIZATION FIRST applyOnce > this tab is now leader > prefix: ${this._prefix} > currentRandomId: ${this._currentRandomId}`
+        );
+      }
     });
 
     this.initializeSilentRenewFinishedChannelWithHandler();

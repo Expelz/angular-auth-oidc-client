@@ -1,6 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { Inject, Injectable, Renderer2, RendererFactory2 } from '@angular/core';
 import { Observable } from 'rxjs';
+import { AuthStateLauchedType } from '../flows/flows-data.service';
 import { LoggerService } from '../logging/logger.service';
 import { UrlService } from '../utils/url/url.service';
 import { SilentRenewService } from './silent-renew.service';
@@ -19,9 +20,12 @@ export class RefreshSessionIframeService {
     this.renderer = rendererFactory.createRenderer(null, null);
   }
 
-  refreshSessionWithIframe(customParams?: { [key: string]: string | number | boolean }): Observable<boolean> {
+  refreshSessionWithIframe(
+    customParams?: { [key: string]: string | number | boolean },
+    authStateLauchedType?: AuthStateLauchedType
+  ): Observable<boolean> {
     this.loggerService.logDebug('BEGIN refresh session Authorize Iframe renew');
-    const url = this.urlService.getRefreshSessionSilentRenewUrl(customParams);
+    const url = this.urlService.getRefreshSessionSilentRenewUrl(customParams, authStateLauchedType);
     return this.sendAuthorizeReqestUsingSilentRenew(url);
   }
 

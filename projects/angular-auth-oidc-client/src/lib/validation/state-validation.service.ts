@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ConfigurationProvider } from '../config/config.provider';
 import { CallbackContext } from '../flows/callback-context';
+import { FlowsDataService } from '../flows/flows-data.service';
 import { LoggerService } from '../logging/logger.service';
 import { StoragePersistanceService } from '../storage/storage-persistance.service';
 import { EqualityService } from '../utils/equality/equality.service';
@@ -19,7 +20,8 @@ export class StateValidationService {
     private loggerService: LoggerService,
     private configurationProvider: ConfigurationProvider,
     private equalityService: EqualityService,
-    private flowHelper: FlowHelper
+    private flowHelper: FlowHelper,
+    private flowsDataService: FlowsDataService
   ) {}
 
   getValidatedStateResult(callbackContext: CallbackContext): StateValidationResult {
@@ -32,7 +34,7 @@ export class StateValidationService {
 
   validateState(callbackContext): StateValidationResult {
     const toReturn = new StateValidationResult();
-    const authStateControl = this.storagePersistanceService.read('authStateControl');
+    const authStateControl = this.flowsDataService.getAuthStateControl();
 
     if (!this.tokenValidationService.validateStateFromHashCallback(callbackContext.authResult.state, authStateControl)) {
       this.loggerService.logWarning('authorizedCallback incorrect state');

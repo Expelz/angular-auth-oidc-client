@@ -68,6 +68,7 @@ export class RefreshSessionService {
     }
 
     return from(this.tabsSynchronizationService.isLeaderCheck()).pipe(
+      timeout(2000),
       take(1),
       switchMap((isLeader) => {
         if (isLeader) {
@@ -76,7 +77,7 @@ export class RefreshSessionService {
             this.startRefreshSession(customParams),
             this.silentRenewService.refreshSessionWithIFrameCompleted$.pipe(take(1)),
           ]).pipe(
-            timeout(this.configurationProvider.openIDConfiguration.silentRenewTimeoutInSeconds * 1000),
+            timeout(5000),
             map(([_, callbackContext]) => {
               const isAuthenticated = this.authStateService.areAuthStorageTokensValid();
               if (isAuthenticated) {
@@ -98,7 +99,7 @@ export class RefreshSessionService {
                 } else {
                   currentRetry = 1;
                 }
-                return this.silentRenewCase(customParams, currentRetry);
+                return this.silentRenewCase(customParams, currentRetry).pipe(take(1));
               }
 
               throw error;
@@ -108,22 +109,7 @@ export class RefreshSessionService {
           this.loggerService.logDebug(`forceRefreshSession WE ARE NOT NOT NOT LEADER`);
           return this.tabsSynchronizationService.getSilentRenewFinishedObservable().pipe(
             take(1),
-            timeout(this.configurationProvider.openIDConfiguration.silentRenewTimeoutInSeconds * 1000),
-            catchError((error) => {
-              if (error instanceof TimeoutError) {
-                this.loggerService.logWarning(
-                  `forceRefreshSession WE ARE NOT NOT NOT LEADER > occured TIMEOUT ERROR SO WE RETRY: this.forceRefreshSession(customParams)`
-                );
-                if (currentRetry) {
-                  currentRetry++;
-                } else {
-                  currentRetry = 1;
-                }
-                return this.silentRenewCase(customParams, currentRetry);
-              }
-
-              throw error;
-            }),
+            timeout(5000),
             map(() => {
               const isAuthenticated = this.authStateService.areAuthStorageTokensValid();
               this.loggerService.logDebug(
@@ -140,9 +126,39 @@ export class RefreshSessionService {
                 `forceRefreshSession WE ARE NOT NOT NOT LEADER > getSilentRenewFinishedObservable EMMITS VALUE > isAuthenticated FALSE WE DONT KNOW WAHT TO DO WITH THIS`
               );
               return null;
+            }),
+            catchError((error) => {
+              if (error instanceof TimeoutError) {
+                this.loggerService.logWarning(
+                  `forceRefreshSession WE ARE NOT NOT NOT LEADER > occured TIMEOUT ERROR SO WE RETRY: this.forceRefreshSession(customParams)`
+                );
+                if (currentRetry) {
+                  currentRetry++;
+                } else {
+                  currentRetry = 1;
+                }
+                return this.silentRenewCase(customParams, currentRetry).pipe(take(1));
+              }
+
+              throw error;
             })
           );
         }
+      }),
+      catchError((error) => {
+        if (error instanceof TimeoutError) {
+          this.loggerService.logWarning(
+            `forceRefreshSession > FROM isLeaderCheck > occured TIMEOUT ERROR SO WE RETRY: this.forceRefreshSession(customParams)`
+          );
+          if (currentRetry) {
+            currentRetry++;
+          } else {
+            currentRetry = 1;
+          }
+          return this.silentRenewCase(customParams, currentRetry);
+        }
+
+        throw error;
       })
     );
   }
@@ -172,7 +188,7 @@ export class RefreshSessionService {
           return this.refreshSessionRefreshTokenService.refreshSessionWithRefreshTokens(customParams);
         }
 
-        return this.refreshSessionIframeService.refreshSessionWithIframe(customParams);
+        return this.refreshSessionIframeService.refreshSessionWithIframe(customParams, 'login');
       })
     );
   }

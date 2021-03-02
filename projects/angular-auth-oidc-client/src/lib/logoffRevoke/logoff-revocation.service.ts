@@ -5,6 +5,7 @@ import { catchError, switchMap, tap } from 'rxjs/operators';
 import { DataService } from '../api/data.service';
 import { FlowsService } from '../flows/flows.service';
 import { CheckSessionService } from '../iframe/check-session.service';
+import { TabsSynchronizationService } from '../iframe/tabs-synchronization.service';
 import { LoggerService } from '../logging/logger.service';
 import { StoragePersistanceService } from '../storage/storage-persistance.service';
 import { RedirectService } from '../utils/redirect/redirect.service';
@@ -19,13 +20,15 @@ export class LogoffRevocationService {
     private urlService: UrlService,
     private checkSessionService: CheckSessionService,
     private flowsService: FlowsService,
-    private redirectService: RedirectService
+    private redirectService: RedirectService,
+    private tabsSynchronizationService: TabsSynchronizationService
   ) {}
 
   // Logs out on the server and the local client.
   // If the server state has changed, checksession, then only a local logout.
   logoff(urlHandler?: (url: string) => any) {
     this.loggerService.logDebug('logoff, remove auth ');
+    this.tabsSynchronizationService.closeTabSynchronization();
     const endSessionUrl = this.getEndSessionUrl();
     this.flowsService.resetAuthorizationData();
 
@@ -44,6 +47,7 @@ export class LogoffRevocationService {
   }
 
   logoffLocal() {
+    this.tabsSynchronizationService.closeTabSynchronization();
     this.flowsService.resetAuthorizationData();
   }
 

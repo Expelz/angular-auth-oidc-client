@@ -2,7 +2,7 @@ import { HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { oneLineTrim } from 'common-tags';
 import { ConfigurationProvider } from '../../config/config.provider';
-import { FlowsDataService } from '../../flows/flows-data.service';
+import { AuthStateLauchedType, FlowsDataService } from '../../flows/flows-data.service';
 import { LoggerService } from '../../logging/logger.service';
 import { StoragePersistanceService } from '../../storage/storage-persistance.service';
 import { TokenValidationService } from '../../validation/token-validation.service';
@@ -41,9 +41,12 @@ export class UrlService {
     return anyParameterIsGiven;
   }
 
-  getRefreshSessionSilentRenewUrl(customParams?: { [key: string]: string | number | boolean }): string {
+  getRefreshSessionSilentRenewUrl(
+    customParams?: { [key: string]: string | number | boolean },
+    authStateLauchedType?: AuthStateLauchedType
+  ): string {
     if (this.flowHelper.isCurrentFlowCodeFlow()) {
-      return this.createUrlCodeFlowWithSilentRenew(customParams);
+      return this.createUrlCodeFlowWithSilentRenew(customParams, authStateLauchedType);
     }
 
     return this.createUrlImplicitFlowWithSilentRenew(customParams) || '';
@@ -246,7 +249,7 @@ export class UrlService {
   }
 
   private createUrlImplicitFlowWithSilentRenew(customParams?: { [key: string]: string | number | boolean }): string {
-    const state = this.flowsDataService.getExistingOrCreateAuthStateControl();
+    const state = this.flowsDataService.getExistingOrCreateAuthStateControl('silent-renew-code');
     const nonce = this.flowsDataService.createNonce();
 
     const silentRenewUrl = this.getSilentRenewUrl();
@@ -266,8 +269,15 @@ export class UrlService {
     return null;
   }
 
-  private createUrlCodeFlowWithSilentRenew(customParams?: { [key: string]: string | number | boolean }): string {
-    const state = this.flowsDataService.createAuthStateControl();
+  private createUrlCodeFlowWithSilentRenew(
+    customParams?: { [key: string]: string | number | boolean },
+    authStateLauchedType?: AuthStateLauchedType
+  ): string {
+    const state =
+      authStateLauchedType === 'login'
+        ? this.flowsDataService.getExistingOrCreateAuthStateControl(authStateLauchedType)
+        : this.flowsDataService.createAuthStateControl(authStateLauchedType);
+
     const nonce = this.flowsDataService.createNonce();
 
     this.loggerService.logDebug('RefreshSession created. adding myautostate: ' + state);
@@ -292,7 +302,7 @@ export class UrlService {
   }
 
   private createUrlImplicitFlowAuthorize(customParams?: { [key: string]: string | number | boolean }): string {
-    const state = this.flowsDataService.getExistingOrCreateAuthStateControl();
+    const state = this.flowsDataService.getExistingOrCreateAuthStateControl('login');
     const nonce = this.flowsDataService.createNonce();
     this.loggerService.logDebug('Authorize created. adding myautostate: ' + state);
 
@@ -312,7 +322,7 @@ export class UrlService {
   }
 
   private createUrlCodeFlowAuthorize(customParams?: { [key: string]: string | number | boolean }): string {
-    const state = this.flowsDataService.createAuthStateControl();
+    const state = this.flowsDataService.getExistingOrCreateAuthStateControl('login');
     const nonce = this.flowsDataService.createNonce();
     this.loggerService.logDebug('Authorize created. adding myautostate: ' + state);
 

@@ -54,6 +54,13 @@ export class PeriodicallyTokenCheckService {
           return of(null);
         }
 
+        if (this.tabsSynchronizationService.isClosed) {
+          this.loggerService.logWarning(
+            'startTokenValidationPeriodically > this.tabsSynchronizationService.isClosed = TRUE - so we re-initialize'
+          );
+          this.tabsSynchronizationService.reInitialize();
+        }
+
         const idTokenHasExpired = this.authStateService.hasIdTokenExpired();
         const accessTokenHasExpired = this.authStateService.hasAccessTokenExpiredIfExpiryExists();
 
@@ -83,7 +90,7 @@ export class PeriodicallyTokenCheckService {
                 return this.refreshSessionRefreshTokenService.refreshSessionWithRefreshTokens(customParams);
               }
 
-              return this.refreshSessionIframeService.refreshSessionWithIframe(customParams);
+              return this.refreshSessionIframeService.refreshSessionWithIframe(customParams, 'silent-renew-code');
             }
 
             return of(null);

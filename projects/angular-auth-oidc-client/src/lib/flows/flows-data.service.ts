@@ -10,6 +10,8 @@ export interface MutualExclusionLockingModel {
   state: string;
 }
 
+export type AuthStateLauchedType = 'login' | 'silent-renew-code' | 'refresh-token';
+
 @Injectable()
 export class FlowsDataService {
   constructor(
@@ -29,26 +31,46 @@ export class FlowsDataService {
     this.storagePersistanceService.write('authNonce', nonce);
   }
 
-  getAuthStateControl(): any {
+  getAuthStateControl(authStateLauchedType: AuthStateLauchedType = null): any {
     const json = this.storagePersistanceService.read('authStateControl');
     const storageObject = !!json ? JSON.parse(json) : null;
 
-    this.loggerService.logDebug(`getAuthStateControl > currentTime: ${new Date().toTimeString()}`);
+    this.loggerService.logDebug(
+      `getAuthStateControl > currentTime: ${new Date().toTimeString()} > storageObject see inner details:`,
+      storageObject
+    );
 
     if (storageObject) {
-      const dateOfLaunchedProcessUtc = Date.parse(storageObject.dateOfLaunchedProcessUtc);
-      const currentDateUtc = Date.parse(new Date().toISOString());
-      const elapsedTimeInMilliseconds = Math.abs(currentDateUtc - dateOfLaunchedProcessUtc);
-      const isProbablyStuck = elapsedTimeInMilliseconds > this.configurationProvider.openIDConfiguration.silentRenewTimeoutInSeconds * 1000;
-
-      if (isProbablyStuck) {
-        this.loggerService.logWarning('getAuthStateControl -> silent renew process is probably stuck, AuthState will be reset.');
-        this.storagePersistanceService.write('authStateControl', '');
+      if (authStateLauchedType === 'login' && storageObject.lauchedFrom !== 'login') {
+        this.loggerService.logWarning(
+          `getAuthStateControl > STATE SHOULD BE RE-INITIALIZED FOR LOGIN FLOW > currentTime: ${new Date().toTimeString()}`
+        );
         return false;
       }
 
+      if (storageObject.lauchedFrom === 'silent-renew-code') {
+        this.loggerService.logDebug(
+          `getAuthStateControl > STATE LAUNCHED FROM SILENT RENEW: ${storageObject.state} > storageObject.lauchedFrom ${
+            storageObject.lauchedFrom
+          } >  currentTime: ${new Date().toTimeString()}`
+        );
+        const dateOfLaunchedProcessUtc = Date.parse(storageObject.dateOfLaunchedProcessUtc);
+        const currentDateUtc = Date.parse(new Date().toISOString());
+        const elapsedTimeInMilliseconds = Math.abs(currentDateUtc - dateOfLaunchedProcessUtc);
+        const isProbablyStuck =
+          elapsedTimeInMilliseconds > this.configurationProvider.openIDConfiguration.silentRenewTimeoutInSeconds * 1000;
+
+        if (isProbablyStuck) {
+          this.loggerService.logWarning('getAuthStateControl -> silent renew process is probably stuck, AuthState will be reset.');
+          this.storagePersistanceService.write('authStateControl', '');
+          return false;
+        }
+      }
+
       this.loggerService.logDebug(
-        `getAuthStateControl > STATE SUCCESSFULLY RETURNED ${storageObject.state} > currentTime: ${new Date().toTimeString()}`
+        `getAuthStateControl > storageObject.lauchedFrom ${storageObject.lauchedFrom} > STATE SUCCESSFULLY RETURNED ${
+          storageObject.state
+        } > currentTime: ${new Date().toTimeString()}`
       );
 
       return storageObject.state;
@@ -63,21 +85,22 @@ export class FlowsDataService {
     this.storagePersistanceService.write('authStateControl', authStateControl);
   }
 
-  getExistingOrCreateAuthStateControl(): any {
-    let state = this.getAuthStateControl();
+  getExistingOrCreateAuthStateControl(authStateLauchedType: AuthStateLauchedType): any {
+    let state = this.getAuthStateControl(authStateLauchedType);
     if (!state) {
-      state = this.createAuthStateControl();
+      state = this.createAuthStateControl(authStateLauchedType);
     }
     return state;
   }
 
-  createAuthStateControl(): any {
+  createAuthStateControl(authStateLauchedType: AuthStateLauchedType): any {
     const state = this.randomService.createRandom(40);
     const storageObject = {
       state: state,
       dateOfLaunchedProcessUtc: new Date().toISOString(),
+      lauchedFrom: authStateLauchedType,
     };
-    this.storagePersistanceService.write('authStateControl', storageObject);
+    this.storagePersistanceService.write('authStateControl', JSON.stringify(storageObject));
     return state;
   }
 
