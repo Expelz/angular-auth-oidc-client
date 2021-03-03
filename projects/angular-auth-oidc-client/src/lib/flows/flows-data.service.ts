@@ -31,6 +31,32 @@ export class FlowsDataService {
     this.storagePersistanceService.write('authNonce', nonce);
   }
 
+  getAuthStateControlWithoutAnyCheck(): any {
+    const json = this.storagePersistanceService.read('authStateControl');
+    const storageObject = !!json ? JSON.parse(json) : null;
+
+    this.loggerService.logDebug(
+      `getAuthStateControlWithoutAnyCheck > currentTime: ${new Date().toTimeString()} > storageObject see inner details:`,
+      storageObject
+    );
+
+    if (storageObject) {
+      this.loggerService.logDebug(
+        `getAuthStateControlWithoutAnyCheck > storageObject.lauchedFrom ${storageObject.lauchedFrom} > STATE SUCCESSFULLY RETURNED ${
+          storageObject.state
+        } > currentTime: ${new Date().toTimeString()}`
+      );
+
+      return storageObject.state;
+    }
+
+    this.loggerService.logWarning(
+      `getAuthStateControlWithoutAnyCheck > storageObject IS NULL RETURN FALSE > currentTime: ${new Date().toTimeString()}`
+    );
+
+    return false;
+  }
+
   getAuthStateControl(authStateLauchedType: AuthStateLauchedType = null): any {
     const json = this.storagePersistanceService.read('authStateControl');
     const storageObject = !!json ? JSON.parse(json) : null;

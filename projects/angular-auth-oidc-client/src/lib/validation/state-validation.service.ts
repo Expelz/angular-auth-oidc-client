@@ -34,7 +34,7 @@ export class StateValidationService {
 
   validateState(callbackContext): StateValidationResult {
     const toReturn = new StateValidationResult();
-    const authStateControl = this.flowsDataService.getAuthStateControl();
+    const authStateControl = this.flowsDataService.getAuthStateControlWithoutAnyCheck();
 
     if (!this.tokenValidationService.validateStateFromHashCallback(callbackContext.authResult.state, authStateControl)) {
       this.loggerService.logWarning('authorizedCallback incorrect state');
