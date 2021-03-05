@@ -115,6 +115,8 @@ export class SilentRenewService {
       this.loggerService.logError(
         `silentRenewEventHandler > states don't match stateFromUrl: ${stateFromUrl} currentState: ${currentState}`
       );
+
+      return;
     }
 
     this.tabsSynchronizationService.isLeaderCheck().then((isLeader) => {
@@ -132,6 +134,14 @@ export class SilentRenewService {
 
       callback$.subscribe(
         (callbackContext) => {
+          if (callbackContext?.validationResult?.state === ValidationResult.StatesDoNotMatch){
+            this.loggerService.logError(
+              `silentRenewEventHandler > inside subscribe for codeRequestCallback > states don't match stateFromUrl: ${stateFromUrl} currentState: ${currentState}`
+            );
+
+            return;
+          }
+
           this.refreshSessionWithIFrameCompletedInternal$.next(callbackContext);
           this.flowsDataService.resetSilentRenewRunning();
           this.tabsSynchronizationService.sendSilentRenewFinishedNotification();
