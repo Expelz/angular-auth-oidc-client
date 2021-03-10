@@ -55,9 +55,19 @@ export class FlowsService {
 
   processSilentRenewCodeFlowCallback(firstContext: CallbackContext) {
     return this.codeFlowCodeRequestOnlyForSilentRenew(firstContext).pipe(
-      switchMap((callbackContext) => this.callbackHistoryAndResetJwtKeys(callbackContext)),
-      switchMap((callbackContext) => this.callbackStateValidation(callbackContext)),
-      switchMap((callbackContext) => this.callbackUser(callbackContext))
+      switchMap((callbackContext) => {
+        if (callbackContext?.validationResult?.state === ValidationResult.StatesDoNotMatch){
+          this.loggerService.logError(
+            `processSilentRenewCodeFlowCallback > AFTER TOKEN REQUEST STATES DONT MATCH VALIDATION RESULT = ValidationResult.StatesDoNotMatch`
+          );
+
+          return of(callbackContext);
+        }
+
+        return of(callbackContext).pipe(switchMap((callbackContext) => this.callbackHistoryAndResetJwtKeys(callbackContext)),
+          switchMap((callbackContext) => this.callbackStateValidation(callbackContext)),
+          switchMap((callbackContext) => this.callbackUser(callbackContext)))
+      })
     );
   }
 
