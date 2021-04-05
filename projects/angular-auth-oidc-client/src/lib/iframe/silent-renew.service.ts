@@ -1,4 +1,4 @@
-﻿import { HttpParams } from '@angular/common/http';
+﻿import { HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { of, Subject, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -90,6 +90,12 @@ export class SilentRenewService {
 
     return this.flowsService.processSilentRenewCodeFlowCallback(callbackContext).pipe(
       catchError((errorFromFlow) => {
+        if (errorFromFlow instanceof HttpErrorResponse && errorFromFlow.status === 504) {
+          this.loggerService.logError(
+            'processSilentRenewCodeFlowCallback catchError statement re-throw error without any reset. Original error ' + errorFromFlow
+          );
+          return throwError(errorFromFlow);
+        }
         this.intervallService.stopPeriodicallTokenCheck();
         this.flowsService.resetAuthorizationData();
         return throwError(errorFromFlow);
@@ -134,7 +140,7 @@ export class SilentRenewService {
 
       callback$.subscribe(
         (callbackContext) => {
-          if (callbackContext?.validationResult?.state === ValidationResult.StatesDoNotMatch){
+          if (callbackContext?.validationResult?.state === ValidationResult.StatesDoNotMatch) {
             this.loggerService.logError(
               `silentRenewEventHandler > inside subscribe for codeRequestCallback > states don't match stateFromUrl: ${stateFromUrl} currentState: ${currentState}`
             );
@@ -147,6 +153,12 @@ export class SilentRenewService {
           this.tabsSynchronizationService.sendSilentRenewFinishedNotification();
         },
         (err: any) => {
+          if (err instanceof HttpErrorResponse && err.status === 504) {
+            this.loggerService.logError(
+              'silentRenewEventHandler from Callback catch timeout error so we finish this process. Original error ' + err
+            );
+            return;
+          }
           this.loggerService.logError('Error: ' + err);
           this.refreshSessionWithIFrameCompletedInternal$.next(null);
           this.flowsDataService.resetSilentRenewRunning();
