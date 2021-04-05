@@ -154,6 +154,32 @@ export class UrlService {
     return oneLineTrim`${dataForBody}&redirect_uri=${redirectUrl}`;
   }
 
+  createBodyForCodeFlowCodeRequestOnlyForSilentRenew(code: string): string {
+    const codeVerifier = this.flowsDataService.getCodeVerifier();
+    if (!codeVerifier) {
+      this.loggerService.logError(`CodeVerifier is not set `, codeVerifier);
+      return null;
+    }
+
+    const clientId = this.getClientId();
+
+    if (!clientId) {
+      return null;
+    }
+
+    const dataForBody = oneLineTrim`grant_type=authorization_code
+            &client_id=${clientId}
+            &code_verifier=${codeVerifier}
+            &code=${code}`;
+
+    const silentRenewUrl = this.getSilentRenewUrl();
+    const body = oneLineTrim`${dataForBody}&redirect_uri=${silentRenewUrl}`;
+
+    this.loggerService.logDebug(`From createBodyForCodeFlowCodeRequestOnlyForSilentRenew BODY IS: `, body);
+
+    return body;
+  }
+
   createBodyForCodeFlowRefreshTokensRequest(refreshtoken: string, customParams?: { [key: string]: string | number | boolean }): string {
     const clientId = this.getClientId();
 

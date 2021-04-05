@@ -56,7 +56,7 @@ export class FlowsService {
   processSilentRenewCodeFlowCallback(firstContext: CallbackContext) {
     return this.codeFlowCodeRequestOnlyForSilentRenew(firstContext).pipe(
       switchMap((callbackContext) => {
-        if (callbackContext?.validationResult?.state === ValidationResult.StatesDoNotMatch){
+        if (callbackContext?.validationResult?.state === ValidationResult.StatesDoNotMatch) {
           this.loggerService.logError(
             `processSilentRenewCodeFlowCallback > AFTER TOKEN REQUEST STATES DONT MATCH VALIDATION RESULT = ValidationResult.StatesDoNotMatch`
           );
@@ -64,9 +64,11 @@ export class FlowsService {
           return of(callbackContext);
         }
 
-        return of(callbackContext).pipe(switchMap((callbackContext) => this.callbackHistoryAndResetJwtKeys(callbackContext)),
+        return of(callbackContext).pipe(
+          switchMap((callbackContext) => this.callbackHistoryAndResetJwtKeys(callbackContext)),
           switchMap((callbackContext) => this.callbackStateValidation(callbackContext)),
-          switchMap((callbackContext) => this.callbackUser(callbackContext)))
+          switchMap((callbackContext) => this.callbackUser(callbackContext))
+        );
       })
     );
   }
@@ -279,11 +281,10 @@ export class FlowsService {
     let headers: HttpHeaders = new HttpHeaders();
     headers = headers.set('Content-Type', 'application/x-www-form-urlencoded');
 
-    const bodyForCodeFlow = this.urlService.createBodyForCodeFlowCodeRequest(callbackContext.code);
+    const bodyForCodeFlow = this.urlService.createBodyForCodeFlowCodeRequestOnlyForSilentRenew(callbackContext.code);
 
     return this.dataService.post(tokenEndpoint, bodyForCodeFlow, headers).pipe(
       switchMap((response) => {
-
         const currentState = this.flowsDataService.getAuthStateControl();
         const isStateCorrectAfterTokenRequest = this.tokenValidationService.validateStateFromHashCallback(
           callbackContext.state,
@@ -300,10 +301,10 @@ export class FlowsService {
             authResponseIsValid: null,
             decodedIdToken: null,
             idToken: null,
-            state: ValidationResult.StatesDoNotMatch
+            state: ValidationResult.StatesDoNotMatch,
           };
 
-          return(of(callbackContext));
+          return of(callbackContext);
         }
 
         let authResult: any = new Object();
