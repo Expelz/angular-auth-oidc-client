@@ -18,8 +18,8 @@ export class CheckSessionService {
   private scheduledHeartBeatRunning: any;
   private lastIFrameRefresh = 0;
   private outstandingMessages = 0;
-  private heartBeatInterval = 3000;
-  private iframeRefreshInterval = 60000;
+  private heartBeatInterval = 15000;
+  private iframeRefreshInterval = 300000;
   private checkSessionChangedInternal$ = new BehaviorSubject<boolean>(false);
 
   get checkSessionChanged$() {
